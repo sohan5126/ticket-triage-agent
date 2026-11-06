@@ -98,10 +98,17 @@ class TriageAgent:
 
     def draft_reply(self, cat, pri, body):
         """Uses an LLM if ANTHROPIC_API_KEY is set, otherwise a template (so the app works offline)."""
-        if os.getenv("ANTHROPIC_API_KEY"):
+        api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not api_key:
+            try:
+                import streamlit as st
+                api_key = st.secrets.get("ANTHROPIC_API_KEY")
+            except Exception:
+                api_key = None
+        if api_key:
             try:
                 import anthropic
-                msg = anthropic.Anthropic().messages.create(
+                msg = anthropic.Anthropic(api_key=api_key).messages.create(
                     model="claude-sonnet-4-5", max_tokens=250,
                     messages=[{"role": "user", "content":
                                f"Write a short, empathetic support reply (max 80 words). "
