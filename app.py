@@ -60,14 +60,21 @@ with tab3:
         inp = pd.read_csv(up)
         missing = {"subject", "body"} - set(inp.columns)
         if missing:
-            st.error(f"Missing columns: {', '.join(missing)}")
+            st.error(f"Missing columns: {', '.join(sorted(missing))}")
             st.stop()
+        # rename any existing result columns so they don't clash with predictions
+        clash = ["category", "priority", "team", "sla_hours", "escalate"]
+        inp = inp.rename(columns={c: f"given_{c}" for c in clash if c in inp.columns})
+        if "customer_tier" not in inp.columns:
+            inp["customer_tier"] = "Free"
         out = []
         for _, row in inp.iterrows():
-            r = agent.run(row["subject"], row["body"], row.get("customer_tier", "Free"))
+            r = agent.run(row["subject"], row["body"], row["customer_tier"])
             out.append(dict(category=r.category, priority=r.priority, team=r.team,
                             sla_hours=r.sla_hours, escalate=r.escalate))
-        res = pd.concat([inp, pd.DataFrame(out)], axis=1)
+        res = pd.concat([inp.reset_index(drop=True), pd.DataFrame(out)], axis=1)
+        if "given_priority" in res.columns:
+            st.metric("Priority matches the file's labels", f"{(res.priority == res.given_priority).mean():.0%}")
         st.dataframe(res, use_container_width=True)
         st.download_button("Download results", res.to_csv(index=False), "triaged.csv")
 
